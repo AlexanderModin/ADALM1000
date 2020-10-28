@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+ADALM1000
+Reflexladung eines NiMH-Akku AA
+https://analogdevicesinc.github.io/libsmu/classsmu_1_1Signal.html
+28.10.2020, A. Modin
+"""
+import time
+from pysmu import Session, Mode
+import numpy as np
+import datetime as dt 
+
+def rounded_mean(l):
+            """Simple average of list values rounded to four decimals."""
+            return round(sum(l) / len(l), 4)
+try: 
+ 
+    session = Session()
+    dev = session.devices[0]
+    chan_a = dev.channels['A']
+    chan_b = dev.channels['B'] 
+    chan_a.mode = Mode.SIMV
+    chan_b.mode = Mode.HI_Z
+    samples = []    
+    max_zeit = 240
+    
+    t1=dt.datetime.now()
+    
+    if session.devices:
+        chan_b_voltages_1 = []     
+
+        j = 0
+        
+        for i in range(max_zeit):            
+            chan_a.constant(0.250)
+            dev.ctrl_transfer(0x40, 0x50, 0, 0, 0, 0, 100)
+            session.start(1)
+            time.sleep(60)
+            chan_a.constant(0)
+            dev.ctrl_transfer(0x40, 0x51, 0, 0, 0, 0, 100)
+            session.start(1)
+            print('HIER')
+            dev.ctrl_transfer(0x40, 0x51, 1, 0, 0, 0, 100)
+            time.sleep(0.5)   
+            samples = dev.get_samples(1000) # Spannungswerte aufnehmen
+            dev.ctrl_transfer(0x40, 0x50, 1, 0, 0, 0, 100)            
+            
+            chan_b_voltages = [x[1][0] for x in samples] # Nur den Spannungswert des KAnals B speichern
+            
+            chan_b_voltages_1 = np.hstack((chan_b_voltages_1, rounded_mean(chan_b_voltages)))
+
+            print(chan_b_voltages_1[j])
+            time.sleep(1) 
+
+            spannung = 4.99-chan_b_voltages_1[j]
+            print(spannung)
+            if (spannung >= 1.2):
+                i = max_zeit+1
+                if (1):
+                    print('Batterie geladen')
+                    chan_a.constant(0)
+                    session.start(1)                    
+            j+=1    
+        session.end()        
+        print('Ladung beendet')  
+
+        while True:
+            pass
+    else:
+        print('no devices attached')
+    
+except KeyboardInterrupt:
+    print()
+    print('Strg + C erkannt...')
+    
+finally:
+    pass
